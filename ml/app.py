@@ -241,6 +241,10 @@ with tab_nilm:
         st.markdown('</div>', unsafe_allow_html=True)
         
     with col_ai:
+        # Preprocess features and scale inputs
+        features = np.array([power, current, pf, voltage], dtype=np.float32)
+        scaled_features = (features - SCALER_MEAN) / SCALER_STD
+        
         # Run inference using embedded neural network weights
         pred_fridge, pred_motor, pred_iron = run_numpy_inference(scaled_features)
         
