@@ -1,6 +1,5 @@
 streamlit
 pandas
 numpy
-tensorflow-cpu
 scikit-learn
 imbalanced-learn

@@ -2,7 +2,6 @@ import os
 import numpy as np
 import pandas as pd
 import streamlit as st
-import tensorflow as tf
 
 # Configure page metadata
 st.set_page_config(
@@ -110,23 +109,68 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-# Load TFLite Model & Scaling parameters
-ML_DIR = os.path.dirname(os.path.abspath(__file__))
-TFLITE_PATH = os.path.join(ML_DIR, "nilm_model_quant.tflite")
-
 # Telemetry scaling factors (extracted from training pipeline)
 SCALER_MEAN = np.array([1207.92521, 7.61260393, 0.519932767, 171.412458], dtype=np.float32)
 SCALER_STD = np.array([881.928994, 4.74120312, 0.332363057, 99.6844349], dtype=np.float32)
 
-@st.cache_resource
-def load_tflite_interpreter():
-    if not os.path.exists(TFLITE_PATH):
-        return None
-    interpreter = tf.lite.Interpreter(model_path=TFLITE_PATH)
-    interpreter.allocate_tensors()
-    return interpreter
+# --- Embedded Model Weights for Pure NumPy Inference ---
+W1 = np.array([
+    [-1.9253312e-35, 2.375183e-35, -0.39021757, -1.7526667e-05, -3.1559515e-35, -1.1156724e-34, -4.433056e-35, -5.5823526e-35, 4.9741767e-35, 2.7438653e-35, 8.6004436e-35, -0.0023691114, -6.534837e-35, -1.7310526e-35, 1.0402372e-34, -9.974867e-35],
+    [-7.651116e-35, -5.3446606e-35, -0.2502486, -6.0222415e-06, -5.4770724e-35, 3.847696e-35, 4.0139484e-35, 1.1405001e-34, -4.578989e-35, -7.2039747e-35, -9.0868296e-36, 0.0016109401, -9.649663e-35, 5.0043176e-35, -6.860453e-36, -3.9132787e-35],
+    [1.0845383e-34, -1.0131337e-34, -0.2557293, -1.9136098e-05, -4.8325847e-35, -9.442386e-35, 8.2996335e-35, 3.8463116e-35, 1.6602032e-35, -5.238731e-35, -6.1362366e-35, -0.004884927, -5.0852253e-35, -3.3239645e-35, -3.2021832e-36, -2.291958e-35],
+    [6.8806024e-35, -4.9294063e-35, -0.0014958241, -1.334473e-06, 6.36317e-35, 7.007025e-35, 2.5720152e-35, -3.4375404e-36, 4.0989924e-35, -2.7180242e-35, -1.2996298e-35, 0.0010623545, -3.5278606e-37, -4.4854523e-36, 7.909948e-35, 6.491913e-35]
+], dtype=np.float32)
 
-interpreter = load_tflite_interpreter()
+b1 = np.array([-3.6465049e-09, -3.607481e-22, 1.0447452, 0.00012861268, -1.8495432e-07, -2.5134679e-11, -6.791822e-08, -1.0341146e-10, -2.144669e-13, -4.3551007e-21, -1.7100825e-09, 0.2093178, -8.122e-08, -9.059567e-08, -5.7374594e-09, -3.8651557e-08], dtype=np.float32)
+
+W2 = np.array([
+    [1.0186273e-34, -8.326532e-36, 4.9605144e-35, -8.7825666e-35, -7.35997e-36, 1.0380809e-35, 1.0143125e-34, -3.7818202e-35],
+    [1.5152665e-35, 8.368909e-35, 6.7200837e-35, -7.6239384e-35, -8.132648e-35, 5.7650594e-36, 4.9852004e-35, -6.904648e-35],
+    [1.0660248e-34, 0.08615767, -3.774563e-35, 0.20830207, -0.43039688, 0.008968685, 0.18380557, -0.0082695205],
+    [-8.224259e-36, 2.8782456e-06, 9.110477e-36, 1.2104023e-05, -2.1289672e-05, 1.2921166e-06, 1.10777155e-05, 2.3695452e-06],
+    [-9.0219645e-35, 5.9260642e-36, 1.0483177e-34, 3.3432044e-35, -1.1025715e-34, 9.630433e-35, -1.0966788e-34, -3.739631e-35],
+    [-4.7081476e-35, -4.1132103e-35, -9.598769e-35, -8.605399e-36, 1.0153433e-34, 2.8813588e-35, 2.1250717e-35, 6.0547963e-35],
+    [7.530614e-35, 6.703111e-35, 4.3076174e-35, -3.1442235e-35, -9.978948e-36, -4.4797605e-35, 4.571594e-35, -4.8170456e-35],
+    [-6.6130655e-35, -3.406387e-35, -7.345986e-35, 7.731118e-35, 3.8282292e-35, -8.5591704e-35, -8.4092346e-35, 6.621019e-35],
+    [7.3128083e-35, 3.8314822e-35, 2.0720613e-35, 4.5138317e-35, -6.171278e-35, 5.275241e-35, 3.6374852e-35, -1.8050737e-35],
+    [4.226402e-35, 8.012257e-35, 5.589935e-35, -6.918414e-35, -2.7919056e-35, 4.7513111e-35, -1.9797822e-35, 2.8196413e-35],
+    [3.4578693e-35, -2.8309233e-35, -5.9334443e-35, 6.155081e-35, 5.73452e-35, 5.8851854e-35, -9.759806e-36, 4.85086e-35],
+    [-1.0232484e-34, 0.0032484317, -5.0535316e-05, 0.0036643005, -0.009052328, 0.0021599825, 0.0035364502, -0.001560281],
+    [-6.659299e-35, 7.872461e-35, 6.754893e-35, -8.830029e-35, 9.139075e-35, -2.5930435e-35, 4.1403603e-35, -2.9132228e-36],
+    [-1.0243019e-34, -8.2496745e-35, 9.657913e-35, 6.621668e-35, -2.2833278e-35, -1.1573074e-34, 1.6784733e-35, -4.9954584e-35],
+    [8.419411e-36, -1.1426048e-34, 1.0176978e-34, 5.081149e-36, -7.5657445e-35, -3.2244086e-35, -5.1502494e-35, -7.7708074e-35],
+    [9.289232e-37, -5.00278e-35, -3.1702644e-35, -5.8379676e-35, -5.378699e-35, 1.0212185e-34, 5.9047216e-35, -1.129891e-34]
+], dtype=np.float32)
+
+b2 = np.array([-0.05021938, 0.65355915, -0.08521196, -0.122765064, 0.24720299, 2.613551, -0.1087434, 2.339427], dtype=np.float32)
+
+W3 = np.array([
+    [0.17535496, 0.65515006, -0.60308295],
+    [-15.495121, 1.179195, -16.33521],
+    [0.56096435, 0.4320646, 0.32561454],
+    [-43.11399, -58.632504, -29.364677],
+    [0.08692742, -47.964935, 44.961037],
+    [4.546543, 1.2854147, -0.58379173],
+    [-29.347458, -53.699474, -21.501865],
+    [7.3104095, 0.76066434, 3.0149424]
+], dtype=np.float32)
+
+b3 = np.array([2.1259143, 0.29111177, -0.4910851], dtype=np.float32)
+
+def relu(x):
+    return np.maximum(0.0, x)
+
+def sigmoid(x):
+    return 1.0 / (1.0 + np.exp(-x))
+
+def run_numpy_inference(scaled_inputs):
+    # Layer 1
+    h1 = relu(np.dot(scaled_inputs, W1) + b1)
+    # Layer 2
+    h2 = relu(np.dot(h1, W2) + b2)
+    # Output layer
+    out = sigmoid(np.dot(h2, W3) + b3)
+    return out
 
 # Header layout
 col_title, col_status = st.columns([4, 1])
@@ -197,37 +241,9 @@ with tab_nilm:
         st.markdown('</div>', unsafe_allow_html=True)
         
     with col_ai:
-        # Compute INT8 inference
-        features = np.array([power, current, pf, voltage], dtype=np.float32)
-        scaled_features = (features - SCALER_MEAN) / SCALER_STD
+        # Run inference using embedded neural network weights
+        pred_fridge, pred_motor, pred_iron = run_numpy_inference(scaled_features)
         
-        # Run inference using interpreter
-        pred_fridge, pred_motor, pred_iron = 0.0, 0.0, 0.0
-        if interpreter is not None:
-            input_details = interpreter.get_input_details()[0]
-            output_details = interpreter.get_output_details()[0]
-            
-            # Quantize input
-            in_scale, in_zero = input_details['quantization']
-            quant_features = np.round(scaled_features / in_scale) + in_zero
-            quant_features = np.clip(quant_features, -128, 127).astype(np.int8)
-            
-            interpreter.set_tensor(input_details['index'], np.expand_dims(quant_features, axis=0))
-            interpreter.invoke()
-            
-            output_data = interpreter.get_tensor(output_details['index'])[0]
-            
-            # Dequantize output
-            out_scale, out_zero = output_details['quantization']
-            dequant_output = (output_data.astype(np.float32) - out_zero) * out_scale
-            
-            pred_fridge, pred_motor, pred_iron = dequant_output
-        else:
-            # Fallback simple math in case interpreter is missing
-            pred_fridge = 1.0 if power > 100 else 0.0
-            pred_motor = 1.0 if (power > 800 and power < 1500) else 0.0
-            pred_iron = 1.0 if power > 1500 else 0.0
-            
         fridge_on = pred_fridge > 0.5
         motor_on = pred_motor > 0.5
         iron_on = pred_iron > 0.5
